@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+
+# Local config/keys
+service_account.json
+config.json
+
+# Editor/system
+.env
+.DS_Store
+Thumbs.db
