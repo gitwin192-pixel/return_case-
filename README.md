@@ -1,17 +1,19 @@
-Shopee Refund Sheet Watcher
+Shopee Refund Sheet Watcher (Excel/Sheet bot)
 
-- Watches a Google Sheet for Shopee order numbers (column A), fetches refund/return details via logged-in Chrome sessions, and writes results into columns B–Q.
-- Uses Chrome remote debugging to piggyback on existing logged-in profiles; can also launch headless Chrome.
-- Logs to stdout with structured messages; optional dry-run mode to skip writes.
+What it does
+- Watches a Google Sheet (like an online Excel) for Shopee order numbers in column A.
+- Uses your logged-in Chrome profiles (or headless Chrome) to fetch refund/return details.
+- Fills columns B–Q with product, buyer, status, logistics, and store info automatically.
+- Skips rows where column B is already filled; clear column B to retry a row.
 
-Tech Stack
+Tech stack
 - Python 3.11+ (tested with CPython 3.13)
 - gspread + google-auth (Google Sheets API via service account)
 - pyppeteer (connect to Chrome remote debugging)
-- Google Sheets API, Shopee Seller Center API (through browser context)
-- Google Chrome (installed locally)
+- Google Sheets API, Shopee Seller Center API (via browser context)
+- Google Chrome
 
-Sheet Layout (Columns)
+Sheet layout (columns)
 - A: order_sn (input)
 - B: nama_produk
 - C: sku_produk
@@ -31,21 +33,30 @@ Sheet Layout (Columns)
 - Q: store_name
 
 Files
-- runner.py — main watcher logic, Chrome/session handling, Shopee fetch, sheet writes.
-- service_account.json — Google service account credentials (keep private).
-- test_runner_parse.py — unit test for parsing logic.
-- config.json (optional) — overrides for runtime settings.
+- runner.py — main watcher (Chrome/session handling, Shopee fetch, sheet writes)
+- service_account.json — Google service account credentials (keep private, don’t commit)
+- test_runner_parse.py — unit test for parsing logic
+- config.json (optional) — overrides for runtime settings
+- requirements.txt — Python dependencies
+- .gitignore — ignores local secrets/config
+
+Quick start (new machine)
+1) Install Python 3.11+ and Google Chrome.
+2) Clone: `git clone https://github.com/gitwin192-pixel/return_case-.git` and `cd return_case-`.
+3) Install deps: `pip install -r requirements.txt`.
+4) Add secrets locally: put `service_account.json` in the project folder; share the target Google Sheet with that service account email so it can edit.
+5) Optional: create `config.json` to override defaults (see below).
+6) Run: `python runner.py`. It fills rows where column B is empty. To retry a row, clear its column B cell (e.g., remove “TIDAK KETEMU”) and it will be reprocessed on the next poll.
 
 Config (config.json)
-- sheet_id: Google Sheet ID (default matches current sheet).
-- sheet_name: tab name (default: prototype).
-- chrome_path: path to Chrome executable.
+- sheet_id / sheet_name: which sheet/tab to watch.
+- chrome_path: path to Chrome.
 - stores: list of stores with code, name, profile_dir, debug_port.
-- poll_seconds: delay between sheet polls.
-- max_retries / retry_backoff_seconds: retries for Chrome/fetch.
-- dry_run: if true, skip sheet writes.
-- headless: if true, launch Chrome headless.
-- headless_port_offset: integer added to each store’s debug_port (use to avoid attaching to visible Chrome).
+- poll_seconds: delay between polls.
+- max_retries / retry_backoff_seconds: retries for Chrome connect and Shopee fetch.
+- dry_run: true = log only, skip sheet writes.
+- headless: true = launch Chrome headless.
+- headless_port_offset: add this to each debug_port to avoid attaching to a visible Chrome session.
 
 Example config.json
 ```json
@@ -73,25 +84,23 @@ Example config.json
 }
 ```
 
-Setup
-- Install deps: `pip install gspread google-auth pyppeteer`.
-- Ensure Chrome is installed and `chrome_path` points to the executable.
-- Place `service_account.json` in `C:\shopee_bot_keys` (or adjust `SERVICE_ACCOUNT_FILE` in runner.py if you move it).
-- Make sure the service account has access to the target Google Sheet.
-
-Requirements
-- Install all deps with `pip install -r C:\shopee_bot_keys\requirements.txt`.
-
 Running
-- From `C:\shopee_bot_keys`: `python runner.py`.
+- `python runner.py`
 - Headless: set `"headless": true` (and optionally `headless_port_offset` to avoid attaching to visible Chrome), then rerun.
-- The watcher processes rows where column B is empty. To reprocess a row, clear its column B cell (e.g., remove “TIDAK KETEMU”) and it will be retried on the next poll.
-- Logs show Shopee fetch attempts and sheet batch updates. If no empty rows, you’ll see “Tidak ada baris kosong untuk diupdate”.
+- Reprocess: clear column B for any row you want retried.
+- Logs show Shopee fetch attempts and batch updates; if no empty rows, you’ll see “Tidak ada baris kosong untuk diupdate”.
+
+Customizing
+- Change sheet/tab: update `sheet_id`/`sheet_name` in config.
+- Switch stores/profiles/ports: edit the `stores` list.
+- Headless vs GUI: toggle `headless`; shift ports with `headless_port_offset` to stay separate from normal Chrome.
+- Polling speed: adjust `poll_seconds`.
+- Safety: set `dry_run` to true to test without writing to the sheet.
 
 Testing
 - `python test_runner_parse.py` (basic parse_refund_summary test).
 
 Troubleshooting
-- Chrome not starting / attaches to visible Chrome: close existing Chrome using the same profile/port, or use `headless_port_offset` to shift ports for headless runs.
-- error=10002: usually params/auth; ensure Chrome is logged in to Seller Center.
-- No sheet updates: ensure column B is empty for rows to process, dry_run is false, and watch for batch update errors in logs.
+- Chrome attaches to your visible session: close that Chrome or use `headless_port_offset` with headless=true.
+- error=10002: usually params/auth; re-login to Shopee Seller Center in that profile.
+- No sheet updates: ensure column B is empty for rows to process, `dry_run` is false, and watch logs for batch update errors.
